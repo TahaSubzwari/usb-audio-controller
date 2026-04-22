@@ -2,7 +2,7 @@
 #include "LCD_2inch.h"
 #include "volume_display.h"
 
-void LCD_2in_test()
+void LCD_Init()
 {
 	printf("LCD_2IN_test Demo\r\n");
 	DEV_Module_Init();
@@ -15,7 +15,7 @@ void LCD_2in_test()
   printf("Paint_NewImage\r\n");
 	Paint_NewImage(LCD_2IN_WIDTH,LCD_2IN_HEIGHT, ROTATE_90, BLACK);
   
-  printf("Set Clear and Display FunCtion\r\n");
+  printf("Set Clear and Display Function\r\n");
 	Paint_SetClearFuntion(LCD_2IN_Clear);
 	Paint_SetDisplayFuntion(LCD_2IN_DrawPaint);
   
@@ -29,10 +29,9 @@ void LCD_2in_test()
   
 }
 
-void DrawVolumeDial(int volume)
+void DrawVolumeDial(int volume, int prev_vol)
 {
-	Paint_Clear(BLACK);
-    UWORD xc = 120; // center (adjust to your screen)
+    UWORD xc = 120; // center for volume
     UWORD yc = 120;
     UWORD radius = 80;
 
@@ -40,20 +39,33 @@ void DrawVolumeDial(int volume)
     float end   = 0.35;
     int scaled = volume * 10;
 
-    // 1. Background arc (grey)
+    //Erase previous state
+    if(prev_vol >= 0){
+    	//Erase previous volume arc by redrawing over it in black
+    	float prev_progress = (prev_vol * 10) / 1000.0f;
+		float prev_current  = start + (end - start) * prev_progress;
+		Paint_DrawArc(xc, yc, radius, start, prev_current, BLACK, DOT_PIXEL_2X2);
+
+		// Erase old number — draw a filled black rectangle over it
+		Paint_DrawRectangle(xc - 30, yc + 40, xc + 30, yc + 60, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    }
+
+    //Background arc (grey)
     Paint_DrawArc(xc, yc, radius, start, end, GRAY, DOT_PIXEL_2X2);
 
-    // 2. Progress arc (filled)
+    // Progress arc (filled)
     float progress = scaled / 1000.0f;
     float current = start + (end - start) * progress;
 
     Paint_DrawArc(xc, yc, radius, start, current, RED, DOT_PIXEL_2X2);
 
-    // 3. Draw number
+    //Volume
     char buf[10];
     sprintf(buf, "%d", volume);
 
     Paint_DrawString_EN(xc - 18, yc + 40, buf, &Font24, WHITE, WHITE);
+
+    prev_vol = volume;
 
     return;
 }

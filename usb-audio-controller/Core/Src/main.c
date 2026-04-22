@@ -22,6 +22,7 @@
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
+#include "usb_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -98,29 +99,42 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM3_Init();
   MX_ADC1_Init();
+  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-  LCD_2in_test();
+  LCD_Init();
   uint32_t adc_val = 0;
   int volume = 0;
   int prev_vol = -1;
+  int last_drawn = -1;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
-	  HAL_ADC_Start(&hadc1);
+	  HAL_ADC_Start(&hadc1);\
+	  //Determine volume level from potentiometer
 	  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
 	  adc_val = HAL_ADC_GetValue(&hadc1);
-		  // Convert 0–4095 → 0–100
+	  // Convert 0–4095 → 0–100
 	  volume = (adc_val * 100) / 4095;
 
-	  if(abs(volume - prev_vol) > 1){
-		  DrawVolumeDial(volume);
-		  prev_vol = volume;
-		  HAL_Delay(500);
+	  //Update volume dial only when user has stopped rotating the pot
+	  static int stable_count = 0;
+
+	  if(abs(volume - prev_vol) < 2){	//minor change (likely noise)
+		  stable_count++;
+	  } else {
+		  stable_count = 0; //Major change (Likely still updating/rotating pot)
 	  }
+
+	  if(stable_count > 3 && abs(volume-last_drawn) > 2)	//Stayed stable for a few cycles
+	  {
+		  DrawVolumeDial(volume, last_drawn);
+		  last_drawn = volume;
+	  }
+
+	  prev_vol = volume;
 	  HAL_Delay(50);
     /* USER CODE END WHILE */
 
@@ -146,15 +160,14 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = 16;
-  RCC_OscInitStruct.PLL.PLLN = 336;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
-  RCC_OscInitStruct.PLL.PLLQ = 7;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 72;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 3;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
