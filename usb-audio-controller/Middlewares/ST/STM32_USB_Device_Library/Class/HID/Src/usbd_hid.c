@@ -157,8 +157,8 @@ __ALIGN_BEGIN static uint8_t USBD_HID_CfgDesc[USB_HID_CONFIG_DESC_SIZ] __ALIGN_E
   0x00,                                               /* bAlternateSetting: Alternate setting */
   0x01,                                               /* bNumEndpoints */
   0x03,                                               /* bInterfaceClass: HID */
-  0x01,                                               /* bInterfaceSubClass : 1=BOOT, 0=no boot */
-  0x02,                                               /* nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse */
+  0x00,                                               /* bInterfaceSubClass : 1=BOOT, 0=no boot */
+  0x00,                                               /* nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse */
   0,                                                  /* iInterface: Index of string descriptor */
   /******************** Descriptor of Joystick Mouse HID ********************/
   /* 18 */
@@ -219,19 +219,21 @@ __ALIGN_BEGIN static uint8_t USBD_HID_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER_
 
 __ALIGN_BEGIN static uint8_t HID_MOUSE_ReportDesc[HID_MOUSE_REPORT_DESC_SIZE] __ALIGN_END =
 {
-    0x05, 0x0C,        // Usage Page (Consumer)
-    0x09, 0x01,        // Usage (Consumer Control)
-    0xA1, 0x01,        // Collection (Application)
-
-    0x85, 0x01,        //   Report ID (1)
-    0x15, 0x00,        //   Logical Minimum (0)
-    0x26, 0xFF, 0x00,  //   Logical Maximum (255)
-    0x75, 0x08,        //   Report Size (8 bits)
-    0x95, 0x01,        //   Report Count (1)
-    0x09, 0xE0,        //   Usage (Volume)
-    0x81, 0x02,        //   Input (Data, Variable, Absolute)
-
-    0xC0               // End Collection
+	0x05, 0x0C,              // Usage Page (Consumer)
+	0x09, 0x01,              // Usage (Consumer Control)
+	0xA1, 0x01,              // Collection (Application)
+	0x85, 0x01,              //   Report ID (1)
+	0x09, 0xE9,              //   Usage (Volume Increment)
+	0x09, 0xEA,              //   Usage (Volume Decrement)
+	0x15, 0x00,              //   Logical Minimum (0)
+	0x25, 0x01,              //   Logical Maximum (1)
+	0x75, 0x01,              //   Report Size (1 bit)
+	0x95, 0x02,              //   Report Count (2)
+	0x81, 0x02,              //   Input (Data, Variable, Absolute)
+	0x75, 0x06,              //   Report Size (6 bits) padding
+	0x95, 0x01,              //   Report Count (1)
+	0x81, 0x03,              //   Input (Constant) padding
+	0xC0                     // End Collection
 };
 
 static uint8_t HIDInEpAdd = HID_EPIN_ADDR;
@@ -612,6 +614,23 @@ static uint8_t *USBD_HID_GetDeviceQualifierDesc(uint16_t *length)
 /**
   * @}
   */
+uint8_t USBD_HID_SendVolumeReport(USBD_HandleTypeDef *pdev, int8_t delta)
+{
+    uint8_t report[2];
+    report[0] = 0x01;  // Report ID
+    if (delta > 0)
+        report[1] = 0x01;  // Volume Increment bit set
+    else if (delta < 0)
+        report[1] = 0x02;  // Volume Decrement bit set
+    else
+        report[1] = 0x00;  // No change
+
+    USBD_HID_SendReport(pdev, report, 2);
+
+    // Send a release report immediately after
+    report[1] = 0x00;
+    return USBD_HID_SendReport(pdev, report, 2);
+}
 
 
 /**

@@ -24,7 +24,7 @@ void LCD_Init()
   DEV_Delay_ms(100);
   
   printf("Painting...\r\n");
-	Paint_SetRotate(ROTATE_0);
+	Paint_SetRotate(ROTATE_180);
 	Paint_DrawString_EN (70, 10, "Volume", &Font20, WHITE, RED);
   
 }

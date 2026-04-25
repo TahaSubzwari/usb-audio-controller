@@ -43,11 +43,11 @@ extern "C" {
 #ifndef HID_EPIN_ADDR
 #define HID_EPIN_ADDR                              0x81U
 #endif /* HID_EPIN_ADDR */
-#define HID_EPIN_SIZE                              0x04U
+#define HID_EPIN_SIZE                              0x02U
 
 #define USB_HID_CONFIG_DESC_SIZ                    34U
 #define USB_HID_DESC_SIZ                           9U
-#define HID_MOUSE_REPORT_DESC_SIZE                 10
+#define HID_MOUSE_REPORT_DESC_SIZE                 29
 
 #define HID_DESCRIPTOR_TYPE                        0x21U
 #define HID_REPORT_DESC                            0x22U
@@ -72,6 +72,7 @@ extern "C" {
   * @}
   */
 
+uint8_t USBD_HID_SendVolumeReport(USBD_HandleTypeDef *pdev, int8_t delta);
 
 /** @defgroup USBD_CORE_Exported_TypesDefinitions
   * @{

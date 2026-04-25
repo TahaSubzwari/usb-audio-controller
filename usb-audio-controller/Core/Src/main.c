@@ -32,6 +32,8 @@
 #include "image.h"
 #include "LCD_2inch.h"
 #include "volume_display.h"
+#include "usbd_hid.h"
+extern USBD_HandleTypeDef hUsbDeviceFS;
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -101,6 +103,8 @@ int main(void)
   MX_ADC1_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
+  HAL_Delay(1000);
+  printf("USB init done\r\n");
   LCD_Init();
   uint32_t adc_val = 0;
   int volume = 0;
@@ -130,11 +134,22 @@ int main(void)
 
 	  if(stable_count > 3 && abs(volume-last_drawn) > 2)	//Stayed stable for a few cycles
 	  {
+
+		  int8_t delta = (volume > last_drawn) ? 1 : -1;
+		  int steps = abs(volume - last_drawn);
+
+		  for(int i = 0; i < steps; i++)
+		  {
+			  USBD_HID_SendVolumeReport(&hUsbDeviceFS, delta);
+			  HAL_Delay(15);  // small delay between reports
+		  }
+
 		  DrawVolumeDial(volume, last_drawn);
 		  last_drawn = volume;
 	  }
 
 	  prev_vol = volume;
+
 	  HAL_Delay(50);
     /* USER CODE END WHILE */
 
@@ -165,9 +180,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
-  RCC_OscInitStruct.PLL.PLLN = 72;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 3;
+  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
