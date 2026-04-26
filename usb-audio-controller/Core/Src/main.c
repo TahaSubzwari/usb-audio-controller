@@ -2,23 +2,14 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
+  * @brief          : USB Audio Controller — main application entry point.
+  *                   Handles rotary encoder polling, USB HID volume reporting,
+  *                   and LCD display updates.
   ******************************************************************************
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "adc.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -32,7 +23,8 @@
 #include "image.h"
 #include "LCD_2inch.h"
 #include "volume_display.h"
-#include "usbd_hid.h"
+#include "usb_audio.h"
+#include <stdio.h>
 extern USBD_HandleTypeDef hUsbDeviceFS;
 /* USER CODE END Includes */
 
@@ -54,7 +46,14 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+uint8_t volume = 50;
+int8_t last_drawn = -1;
+uint8_t last_clk = 1;
+uint8_t last_dt = 1;
+int8_t pending_delta = 0;
+uint32_t last_detent_tick = 0;
+uint32_t last_encoder_tick = 0;
+uint8_t lcd_update_pending = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -65,7 +64,11 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+int __io_putchar(int ch)
+{
+    HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+    return ch;
+}
 /* USER CODE END 0 */
 
 /**
@@ -100,61 +103,75 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   MX_TIM3_Init();
-  MX_ADC1_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-  HAL_Delay(1000);
-  printf("USB init done\r\n");
   LCD_Init();
-  uint32_t adc_val = 0;
-  int volume = 0;
-  int prev_vol = -1;
-  int last_drawn = -1;
+  printf("Starting...\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_ADC_Start(&hadc1);\
-	  //Determine volume level from potentiometer
-	  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-	  adc_val = HAL_ADC_GetValue(&hadc1);
-	  // Convert 0–4095 → 0–100
-	  volume = (adc_val * 100) / 4095;
+      int clk = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_15);
+      int dt  = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
 
-	  //Update volume dial only when user has stopped rotating the pot
-	  static int stable_count = 0;
+      //Encoder Polling
+      if (clk != last_clk || dt != last_dt)	//Change in encoder
+      {
+    	  //Allow the encoder time to settle and reread it (filters noise spikes)
+          HAL_Delay(1);
+          clk = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_15);
+          dt  = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
 
-	  if(abs(volume - prev_vol) < 2){	//minor change (likely noise)
-		  stable_count++;
-	  } else {
-		  stable_count = 0; //Major change (Likely still updating/rotating pot)
-	  }
+          //Detent (click) complete - Both signals are back to high (reset) and we have a pending rotation to send
+          if (clk == 1 && dt == 1 && pending_delta != 0)
+          {
+        	  //Ignore debounce by checking if it has been <10ms since last registered detent
+              uint32_t now = HAL_GetTick();
+              if (now - last_detent_tick >= 10)
+              {
+            	  //Update volume variable for LCD
+                  if (pending_delta > 0 && volume < 100) volume+=2;
+                  if (pending_delta < 0 && volume > 0) volume-=2;
 
-	  if(stable_count > 3 && abs(volume-last_drawn) > 2)	//Stayed stable for a few cycles
-	  {
+                  // Send Press HID report
+                  USBD_HID_SendVolumeReport(&hUsbDeviceFS, pending_delta);
 
-		  int8_t delta = (volume > last_drawn) ? 1 : -1;
-		  int steps = abs(volume - last_drawn);
+                  // Send HID release report immediately after
+                  HAL_Delay(15);
+                  uint8_t release[2] = {0x01, 0x00};
+                  USBD_HID_SendReport(&hUsbDeviceFS, release, 2);
 
-		  for(int i = 0; i < steps; i++)
-		  {
-			  USBD_HID_SendVolumeReport(&hUsbDeviceFS, delta);
-			  HAL_Delay(15);  // small delay between reports
-		  }
+                  // Flag LCD for update, but don't redraw yet
+                  last_encoder_tick = HAL_GetTick();
+                  lcd_update_pending = 1;
+                  last_detent_tick = now;
+              }
+              pending_delta = 0;
+          }
+          // Falling edge on clock: record direction for detent to be sent in next iteration
+          else if (clk == 0 && last_clk == 1)
+          {
+        	  pending_delta = (dt == 1) ? 1 : -1;
+          }
 
-		  DrawVolumeDial(volume, last_drawn);
-		  last_drawn = volume;
-	  }
+          last_clk = clk;
+          last_dt = dt;
+      }
 
-	  prev_vol = volume;
-
-	  HAL_Delay(50);
+      //LCD Updates after 500ms of encoder inactivity
+      if (lcd_update_pending && HAL_GetTick() - last_encoder_tick >= 500)
+      {
+          DrawVolumeDial(volume, last_drawn);
+          last_drawn = volume;
+          lcd_update_pending = 0;
+      }
+  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+
   /* USER CODE END 3 */
 }
 

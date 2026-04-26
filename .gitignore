@@ -1,7 +1,6 @@
 # Build folders
 Debug/
 Release/
-LCD_demo/
 
 # Object + build files
 *.o
@@ -19,3 +18,6 @@ LCD_demo/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# HID Descriptor backup file for generated code
+Descriptor.txt

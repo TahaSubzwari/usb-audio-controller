@@ -43,7 +43,7 @@ extern "C" {
 #ifndef HID_EPIN_ADDR
 #define HID_EPIN_ADDR                              0x81U
 #endif /* HID_EPIN_ADDR */
-#define HID_EPIN_SIZE                              0x02U
+#define HID_EPIN_SIZE                              0x04U
 
 #define USB_HID_CONFIG_DESC_SIZ                    34U
 #define USB_HID_DESC_SIZ                           9U
@@ -72,7 +72,6 @@ extern "C" {
   * @}
   */
 
-uint8_t USBD_HID_SendVolumeReport(USBD_HandleTypeDef *pdev, int8_t delta);
 
 /** @defgroup USBD_CORE_Exported_TypesDefinitions
   * @{
