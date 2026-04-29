@@ -8,6 +8,6 @@
 #define VOLUME_DISPLAY_H
 
 void LCD_Init(void);
-void DrawVolumeDial(int volume, int prev_volume);
+void DrawVolumeDial(int volume, int muted);
 
 #endif

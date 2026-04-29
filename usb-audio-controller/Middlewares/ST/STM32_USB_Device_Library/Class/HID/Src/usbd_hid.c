@@ -219,21 +219,22 @@ __ALIGN_BEGIN static uint8_t USBD_HID_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER_
 
 __ALIGN_BEGIN static uint8_t HID_MOUSE_ReportDesc[HID_MOUSE_REPORT_DESC_SIZE] __ALIGN_END =
 {
-    0x05, 0x0C,              // Usage Page (Consumer)
-    0x09, 0x01,              // Usage (Consumer Control)
-    0xA1, 0x01,              // Collection (Application)
-    0x85, 0x01,              //   Report ID (1)
-    0x09, 0xE9,              //   Usage (Volume Increment)
-    0x09, 0xEA,              //   Usage (Volume Decrement)
-    0x15, 0x00,              //   Logical Minimum (0)
-    0x25, 0x01,              //   Logical Maximum (1)
-    0x75, 0x01,              //   Report Size (1 bit)
-    0x95, 0x02,              //   Report Count (2)
-    0x81, 0x02,              //   Input (Data, Variable, Absolute)
-    0x75, 0x06,              //   Report Size (6 bits) padding
-    0x95, 0x01,              //   Report Count (1)
-    0x81, 0x03,              //   Input (Constant) padding
-    0xC0                     // End Collection
+	0x05, 0x0C,
+	0x09, 0x01,
+	0xA1, 0x01,
+	0x85, 0x01,
+	0x09, 0xE9,        // Volume Increment
+	0x09, 0xEA,        // Volume Decrement
+	0x09, 0xE2,        // Mute
+	0x15, 0x00,
+	0x25, 0x01,
+	0x75, 0x01,        // 1 bit each
+	0x95, 0x03,        // 3 controls now
+	0x81, 0x02,
+	0x75, 0x05,        // 5 bits padding (was 6)
+	0x95, 0x01,
+	0x81, 0x03,
+	0xC0
 };
 
 static uint8_t HIDInEpAdd = HID_EPIN_ADDR;

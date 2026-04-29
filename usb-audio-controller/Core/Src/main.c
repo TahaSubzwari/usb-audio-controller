@@ -25,6 +25,8 @@
 #include "volume_display.h"
 #include "usb_audio.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 extern USBD_HandleTypeDef hUsbDeviceFS;
 /* USER CODE END Includes */
 
@@ -46,14 +48,19 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t volume = 50;
-int8_t last_drawn = -1;
+int last_drawn = -1;
 uint8_t last_clk = 1;
 uint8_t last_dt = 1;
 int8_t pending_delta = 0;
 uint32_t last_detent_tick = 0;
 uint32_t last_encoder_tick = 0;
 uint8_t lcd_update_pending = 0;
+uint32_t last_sw_tick = 0;
+
+char uart_buf[8];
+uint8_t uart_idx = 0;
+volatile int pc_volume = -1;
+int muted = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,6 +122,28 @@ int main(void)
   {
       int clk = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_15);
       int dt  = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
+      int sw = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_13);
+
+      //Mute when pressing rotary encoder
+      if (sw == 0)  // pressed (pull-up, active low)
+      {
+          uint32_t now = HAL_GetTick();
+          if (now - last_sw_tick >= 300)  // debounce
+          {
+              uint8_t mute[2] = {0x01, 0x04};
+              USBD_HID_SendReport(&hUsbDeviceFS, mute, 2);
+              HAL_Delay(15);
+              uint8_t release[2] = {0x01, 0x00};
+              USBD_HID_SendReport(&hUsbDeviceFS, release, 2);
+              muted = !muted;  // toggle flag
+              last_sw_tick = now;
+
+              // Force immediate LCD redraw to show mute state
+			  DrawVolumeDial(pc_volume, muted);
+			  last_drawn = pc_volume;
+			  lcd_update_pending = 0;
+          }
+      }
 
       //Encoder Polling
       if (clk != last_clk || dt != last_dt)	//Change in encoder
@@ -131,10 +160,6 @@ int main(void)
               uint32_t now = HAL_GetTick();
               if (now - last_detent_tick >= 10)
               {
-            	  //Update volume variable for LCD
-                  if (pending_delta > 0 && volume < 100) volume+=2;
-                  if (pending_delta < 0 && volume > 0) volume-=2;
-
                   // Send Press HID report
                   USBD_HID_SendVolumeReport(&hUsbDeviceFS, pending_delta);
 
@@ -160,11 +185,57 @@ int main(void)
           last_dt = dt;
       }
 
-      //LCD Updates after 500ms of encoder inactivity
+      // --- READ PC VOLUME FROM SERIAL ---
+      uint8_t byte;
+      if (HAL_UART_Receive(&huart2, &byte, 1, 0) == HAL_OK)
+      {
+          if (byte == 'V')  // start of new message — reset buffer (ensures that the STM32 knows that we are receiving a new volume level)
+          {
+              uart_idx = 0;
+              memset(uart_buf, 0, sizeof(uart_buf));
+          }
+          else if (byte == '\n')	//End of message, convert the array into an integer representing the volume and flag LCD to redraw
+          {
+              uart_buf[uart_idx] = '\0';
+              if (uart_idx > 0)
+              {
+                  int received = atoi(uart_buf);
+                  if (received >= 0 && received <= 100)
+                  {
+                      if (received != pc_volume)	//If received volume is different from pc_volume, flag to redraw
+                      {
+                          pc_volume = received;
+                          if (HAL_GetTick() - last_encoder_tick >= 500)
+                          {
+                              lcd_update_pending = 1;
+                          }
+                      }
+                      else
+                      {
+                          pc_volume = received;
+                      }
+                  }
+              }
+              uart_idx = 0;
+              memset(uart_buf, 0, sizeof(uart_buf));
+          }
+          else if (byte >= '0' && byte <= '9')	//Digit received, store into array
+          {
+              if (uart_idx < 3)	//uart_buf array should be no bigger than 3 elements (stores digits 0-100)
+              {
+                  uart_buf[uart_idx++] = byte;
+              }
+          }
+      }
+
+      // LCD draws when flagged and encoder is idle
       if (lcd_update_pending && HAL_GetTick() - last_encoder_tick >= 500)
       {
-          DrawVolumeDial(volume, last_drawn);
-          last_drawn = volume;
+          if (pc_volume != last_drawn)
+          {
+              DrawVolumeDial(pc_volume, muted);
+              last_drawn = pc_volume;
+          }
           lcd_update_pending = 0;
       }
   }

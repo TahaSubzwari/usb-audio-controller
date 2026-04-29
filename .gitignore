@@ -21,3 +21,10 @@ Thumbs.db
 
 # HID Descriptor backup file for generated code
 Descriptor.txt
+
+# Python build artifacts
+dist/
+build/
+*.spec
+__pycache__/
+*.pyc

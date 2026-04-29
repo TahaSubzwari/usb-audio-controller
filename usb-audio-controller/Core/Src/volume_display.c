@@ -22,11 +22,11 @@ void LCD_Init()
 	Paint_Clear(BLACK);
 	DEV_Delay_ms(100);
   
-	Paint_DrawString_EN (70, 10, "Volume", &Font20, WHITE, RED);
+	Paint_DrawString_EN (70, 10, "Volume", &Font24, WHITE, RED);
 	printf("LCD Initialized!\r\n");
 }
 
-void DrawVolumeDial(int volume, int prev_vol)
+void DrawVolumeDial(int volume, int muted)
 {
     UWORD xc = 120; // center for volume
     UWORD yc = 120;
@@ -36,28 +36,33 @@ void DrawVolumeDial(int volume, int prev_vol)
     float end   = 0.35;
     int scaled = volume * 10;
 
-    //Erase previous state
-    if(prev_vol >= 0){
-		// Erase old number — draw a filled black rectangle over it
-		Paint_DrawRectangle(xc - 30, yc + 40, xc + 30, yc + 60, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    }
+
+	// Erase old number — draw a filled black rectangle over it
+	Paint_DrawRectangle(xc - 30, yc + 40, xc + 30, yc + 60, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+	Paint_DrawRectangle(xc - 30, yc - 15, xc + 30, yc + +15, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
     //Background arc (grey)
     Paint_DrawArc(xc, yc, radius, start, end, GRAY, DOT_PIXEL_2X2);
 
-    // Progress arc (filled)
-    float progress = scaled / 1000.0f;
-    float current = start + (end - start) * progress;
+    if (muted)
+    {
+    	// Draw arc in grey only, no progress arc
+    	Paint_DrawString_EN(xc - 28, yc - 10, "MUTE", &Font20, WHITE, GRAY);
+    	Paint_DrawString_EN(xc - 18, yc + 38, "--", &Font24, WHITE, GRAY);
+    } else
+    {
+		// Progress arc (filled)
+		float progress = scaled / 1000.0f;
+		float current = start + (end - start) * progress;
 
-    Paint_DrawArc(xc, yc, radius, start, current, RED, DOT_PIXEL_2X2);
+		Paint_DrawArc(xc, yc, radius, start, current, RED, DOT_PIXEL_2X2);
 
-    //Volume
-    char buf[10];
-    sprintf(buf, "%d", volume);
+		//Volume
+		char buf[10];
+		sprintf(buf, "%d", volume);
 
-    Paint_DrawString_EN(xc - 18, yc + 40, buf, &Font24, WHITE, WHITE);
-
-    prev_vol = volume;
+		Paint_DrawString_EN(xc - 18, yc + 40, buf, &Font24, WHITE, WHITE);
+    }
 
     return;
 }
