@@ -19,7 +19,7 @@ STARTUP_REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 def find_stm32_port():
     ports = serial.tools.list_ports.comports()
     for port in ports:
-        if "STMicroelectronics" in port.description or "STLink" in port.description:
+        if port.vid == 0x0483 and port.pid == 0x374B:
             return port.device
     return None
 
