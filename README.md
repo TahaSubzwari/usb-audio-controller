@@ -98,3 +98,5 @@
 
 - Waveshare LCD library (adapted for STM32F401RE)
 
+-KiCAD
+
